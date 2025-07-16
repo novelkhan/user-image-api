@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import { Photo } from './photo.entity';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class UserService {
@@ -12,9 +14,8 @@ export class UserService {
   ) {}
 
   async createUser(dto: any, files: Express.Multer.File[]) {
-    // ⚠️ Check if dto is accidentally an array
     if (Array.isArray(dto)) {
-      dto = dto[0]; // Fix if sent as array
+      dto = dto[0];
     }
 
     const user = new User();
@@ -57,15 +58,25 @@ export class UserService {
     user.name = body.name;
     user.email = body.email;
 
-    // ✅ Remove old selected images
+    // ✅ Remove selected old photos
     let removed = body['removedImages[]'] || body.removedImages;
 
     if (typeof removed === 'string') {
-      removed = [removed]; // handle single image case
+      removed = [removed];
     }
 
     if (Array.isArray(removed)) {
       const toRemove = user.photos.filter((p) => removed.includes(p.url));
+
+      // ✅ Delete files from disk
+      for (const photo of toRemove) {
+        const filePath = path.join(__dirname, '..', '..', 'uploads', photo.url);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      }
+
+      // ✅ Remove from DB
       await this.photoRepo.remove(toRemove);
       user.photos = user.photos.filter((p) => !removed.includes(p.url));
     }
@@ -87,6 +98,14 @@ export class UserService {
     });
 
     if (!user) throw new NotFoundException('User not found');
+
+    // ✅ Delete all associated image files
+    for (const photo of user.photos) {
+      const filePath = path.join(__dirname, '..', '..', 'uploads', photo.url);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
 
     return this.userRepo.remove(user);
   }
