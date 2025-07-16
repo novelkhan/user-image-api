@@ -2,17 +2,16 @@ import {
   Controller,
   Post,
   Get,
-  Param,
-  Body,
   Put,
   Delete,
+  Param,
+  Body,
   UploadedFiles,
   UseInterceptors,
   ParseIntPipe,
 } from '@nestjs/common';
 import { UserService } from './user.service';
-import { CreateUserDto } from './create-user.dto';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 
@@ -22,21 +21,22 @@ export class UserController {
 
   @Post()
   @UseInterceptors(
-    FilesInterceptor('photos', 10, {
+    FileFieldsInterceptor([{ name: 'photos', maxCount: 10 }], {
       storage: diskStorage({
         destination: './uploads',
         filename: (req, file, cb) => {
-          const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, unique + extname(file.originalname));
+          const uniqueName =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, uniqueName + extname(file.originalname));
         },
       }),
     }),
   )
-  create(
-    @Body() body: CreateUserDto,
-    @UploadedFiles() files: Express.Multer.File[],
+  createUser(
+    @Body() body: any,
+    @UploadedFiles() files: { photos?: Express.Multer.File[] },
   ) {
-    return this.userService.createUser(body, files);
+    return this.userService.createUser(body, files?.photos || []);
   }
 
   @Get()
@@ -45,13 +45,29 @@ export class UserController {
   }
 
   @Get(':id')
-  getOne(@Param('id', ParseIntPipe) id: number) {
+  getById(@Param('id', ParseIntPipe) id: number) {
     return this.userService.getUserById(id);
   }
 
   @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() body: CreateUserDto) {
-    return this.userService.updateUser(id, body);
+  @UseInterceptors(
+    FileFieldsInterceptor([{ name: 'photos', maxCount: 10 }], {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, cb) => {
+          const uniqueName =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+          cb(null, uniqueName + extname(file.originalname));
+        },
+      }),
+    }),
+  )
+  updateUser(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+    @UploadedFiles() files: { photos?: Express.Multer.File[] },
+  ) {
+    return this.userService.updateUserWithImages(id, body, files?.photos || []);
   }
 
   @Delete(':id')
