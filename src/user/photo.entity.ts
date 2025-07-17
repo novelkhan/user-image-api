@@ -12,6 +12,9 @@ export class Photo {
   @Column()
   originalName: string;
 
+  @Column()
+  size: number; // ✅ নতুন ফিল্ড
+
   @ManyToOne(() => User, (user) => user.photos, {
     onDelete: 'CASCADE',
   })
