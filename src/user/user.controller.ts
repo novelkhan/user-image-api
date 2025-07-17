@@ -9,11 +9,13 @@ import {
   UploadedFiles,
   UseInterceptors,
   ParseIntPipe,
+  Res,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
+import { Response } from 'express';
 
 @Controller('users')
 export class UserController {
@@ -74,4 +76,10 @@ export class UserController {
   delete(@Param('id', ParseIntPipe) id: number) {
     return this.userService.deleteUser(id);
   }
+
+  @Get('download/:storedName')
+  download(@Param('storedName') storedName: string, @Res() res: Response) {
+    return this.userService.downloadFile(res, storedName);
+  }
+
 }

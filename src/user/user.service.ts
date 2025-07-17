@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Res } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import { Photo } from './photo.entity';
 import * as fs from 'fs';
 import * as path from 'path';
+import { Response } from 'express';
 
 @Injectable()
 export class UserService {
@@ -27,6 +28,7 @@ export class UserService {
       const photo = new Photo();
       photo.url = file.filename;
       photo.originalName = file.originalname;
+      photo.size = file.size;
       user.photos.push(photo);
     }
 
@@ -83,6 +85,7 @@ export class UserService {
       const photo = new Photo();
       photo.url = file.filename;
       photo.originalName = file.originalname;
+      photo.size = file.size;
       user.photos.push(photo);
     }
 
@@ -105,5 +108,18 @@ export class UserService {
     }
 
     return this.userRepo.remove(user);
+  }
+
+  downloadFile(res: Response, storedName: string) {
+    const filePath = path.join(__dirname, '..', '..', 'uploads', storedName);
+    if (!fs.existsSync(filePath)) {
+      throw new NotFoundException('File not found');
+    }
+
+    // ডাটাবেজ থেকে মূল নাম বের করি
+    return this.photoRepo.findOneBy({ url: storedName }).then((photo) => {
+      if (!photo) throw new NotFoundException('Original name not found');
+      res.download(filePath, photo.originalName); // ✅ সঠিক নামে ডাউনলোড
+    });
   }
 }
