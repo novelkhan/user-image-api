@@ -26,6 +26,7 @@ export class UserService {
     for (const file of files) {
       const photo = new Photo();
       photo.url = file.filename;
+      photo.originalName = file.originalname;
       user.photos.push(photo);
     }
 
@@ -58,7 +59,6 @@ export class UserService {
     user.name = body.name;
     user.email = body.email;
 
-    // ✅ Remove selected old photos
     let removed = body['removedImages[]'] || body.removedImages;
 
     if (typeof removed === 'string') {
@@ -68,7 +68,6 @@ export class UserService {
     if (Array.isArray(removed)) {
       const toRemove = user.photos.filter((p) => removed.includes(p.url));
 
-      // ✅ Delete files from disk
       for (const photo of toRemove) {
         const filePath = path.join(__dirname, '..', '..', 'uploads', photo.url);
         if (fs.existsSync(filePath)) {
@@ -76,15 +75,14 @@ export class UserService {
         }
       }
 
-      // ✅ Remove from DB
       await this.photoRepo.remove(toRemove);
       user.photos = user.photos.filter((p) => !removed.includes(p.url));
     }
 
-    // ✅ Add new uploaded images
     for (const file of files) {
       const photo = new Photo();
       photo.url = file.filename;
+      photo.originalName = file.originalname;
       user.photos.push(photo);
     }
 
@@ -99,7 +97,6 @@ export class UserService {
 
     if (!user) throw new NotFoundException('User not found');
 
-    // ✅ Delete all associated image files
     for (const photo of user.photos) {
       const filePath = path.join(__dirname, '..', '..', 'uploads', photo.url);
       if (fs.existsSync(filePath)) {
