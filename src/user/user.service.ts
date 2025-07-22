@@ -3,8 +3,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import { Photo } from './photo.entity';
-import * as fs from 'fs';
-import * as path from 'path';
 import { Response } from 'express';
 
 @Injectable()
@@ -26,9 +24,10 @@ export class UserService {
 
     for (const file of files) {
       const photo = new Photo();
-      photo.url = file.filename;
+      photo.data = file.buffer; // ফাইলের বাইনারি ডাটা
       photo.originalName = file.originalname;
       photo.size = file.size;
+      photo.mimeType = file.mimetype; // ফাইলের MIME টাইপ
       user.photos.push(photo);
     }
 
@@ -61,35 +60,49 @@ export class UserService {
     user.name = body.name;
     user.email = body.email;
 
+    console.log('Request Body:', body);
+    console.log('Removed Images:', body['removedImages[]'] || body.removedImages);
+
     let removed = body['removedImages[]'] || body.removedImages;
 
-    if (typeof removed === 'string') {
-      removed = [removed];
-    }
-
-    if (Array.isArray(removed)) {
-      const toRemove = user.photos.filter((p) => removed.includes(p.url));
-
-      for (const photo of toRemove) {
-        const filePath = path.join(__dirname, '..', '..', 'uploads', photo.url);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-        }
+    if (removed) {
+      if (typeof removed === 'string') {
+        removed = [removed];
       }
 
-      await this.photoRepo.remove(toRemove);
-      user.photos = user.photos.filter((p) => !removed.includes(p.url));
+      if (Array.isArray(removed) && removed.length > 0) {
+        const toRemove = user.photos.filter((p) =>
+          p.id && removed.map(String).includes(p.id.toString()),
+        );
+
+        console.log('Photos to Remove:', toRemove);
+
+        if (toRemove.length > 0) {
+          await this.photoRepo.delete(
+            toRemove.map((photo) => photo.id),
+          );
+          user.photos = user.photos.filter(
+            (p) => !p.id || !removed.map(String).includes(p.id.toString()),
+          );
+
+          console.log('Updated User Photos:', user.photos);
+        }
+      }
     }
 
     for (const file of files) {
       const photo = new Photo();
-      photo.url = file.filename;
+      photo.data = file.buffer; // ফাইলের বাইনারি ডাটা
       photo.originalName = file.originalname;
       photo.size = file.size;
+      photo.mimeType = file.mimetype; // ফাইলের MIME টাইপ
       user.photos.push(photo);
     }
 
-    return this.userRepo.save(user);
+    const updatedUser = await this.userRepo.save(user);
+    console.log('Saved User:', updatedUser);
+
+    return updatedUser;
   }
 
   async deleteUser(id: number) {
@@ -100,26 +113,33 @@ export class UserService {
 
     if (!user) throw new NotFoundException('User not found');
 
-    for (const photo of user.photos) {
-      const filePath = path.join(__dirname, '..', '..', 'uploads', photo.url);
-      if (fs.existsSync(filePath)) {
-        fs.unlinkSync(filePath);
-      }
-    }
-
     return this.userRepo.remove(user);
   }
 
-  downloadFile(res: Response, storedName: string) {
-    const filePath = path.join(__dirname, '..', '..', 'uploads', storedName);
-    if (!fs.existsSync(filePath)) {
+  async downloadFile(res: Response, photoId: string) {
+    const photo = await this.photoRepo.findOne({ where: { id: parseInt(photoId) } });
+    if (!photo) {
       throw new NotFoundException('File not found');
     }
 
-    // ডাটাবেজ থেকে মূল নাম বের করি
-    return this.photoRepo.findOneBy({ url: storedName }).then((photo) => {
-      if (!photo) throw new NotFoundException('Original name not found');
-      res.download(filePath, photo.originalName); // ✅ সঠিক নামে ডাউনলোড
+    res.set({
+      'Content-Type': photo.mimeType,
+      'Content-Disposition': `attachment; filename="${photo.originalName}"`,
     });
+
+    res.send(photo.data); // বাইনারি ডাটা পাঠানো
+  }
+
+  async previewFile(res: Response, photoId: string) {
+    const photo = await this.photoRepo.findOne({ where: { id: parseInt(photoId) } });
+    if (!photo) {
+      throw new NotFoundException('File not found');
+    }
+
+    res.set({
+      'Content-Type': photo.mimeType,
+    });
+
+    res.send(photo.data); // বাইনারি ডাটা পাঠানো প্রিভিউর জন্য
   }
 }

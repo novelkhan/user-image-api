@@ -13,8 +13,6 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname } from 'path';
 import { Response } from 'express';
 
 @Controller('users')
@@ -22,18 +20,7 @@ export class UserController {
   constructor(private readonly userService: UserService) {}
 
   @Post()
-  @UseInterceptors(
-    FileFieldsInterceptor([{ name: 'photos', maxCount: 10 }], {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, cb) => {
-          const uniqueName =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, uniqueName + extname(file.originalname));
-        },
-      }),
-    }),
-  )
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'photos', maxCount: 10 }]))
   createUser(
     @Body() body: any,
     @UploadedFiles() files: { photos?: Express.Multer.File[] },
@@ -52,18 +39,7 @@ export class UserController {
   }
 
   @Put(':id')
-  @UseInterceptors(
-    FileFieldsInterceptor([{ name: 'photos', maxCount: 10 }], {
-      storage: diskStorage({
-        destination: './uploads',
-        filename: (req, file, cb) => {
-          const uniqueName =
-            Date.now() + '-' + Math.round(Math.random() * 1e9);
-          cb(null, uniqueName + extname(file.originalname));
-        },
-      }),
-    }),
-  )
+  @UseInterceptors(FileFieldsInterceptor([{ name: 'photos', maxCount: 10 }]))
   updateUser(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: any,
@@ -77,9 +53,13 @@ export class UserController {
     return this.userService.deleteUser(id);
   }
 
-  @Get('download/:storedName')
-  download(@Param('storedName') storedName: string, @Res() res: Response) {
-    return this.userService.downloadFile(res, storedName);
+  @Get('download/:photoId')
+  download(@Param('photoId') photoId: string, @Res() res: Response) {
+    return this.userService.downloadFile(res, photoId);
   }
 
+  @Get('preview/:photoId')
+  preview(@Param('photoId') photoId: string, @Res() res: Response) {
+    return this.userService.previewFile(res, photoId);
+  }
 }
