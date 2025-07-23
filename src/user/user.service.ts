@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Res } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -138,6 +138,7 @@ export class UserService {
 
     res.set({
       'Content-Type': photo.mimeType,
+      'Content-Disposition': 'inline', // প্রিভিউর জন্য inline
     });
 
     res.send(photo.data); // বাইনারি ডাটা পাঠানো প্রিভিউর জন্য
